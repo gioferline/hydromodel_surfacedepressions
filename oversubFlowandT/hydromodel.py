@@ -59,15 +59,12 @@ def RichardsModel(psi,t,dz,n,p,vg,qTfun,qBot,psiTop,psiBot,DrainLoc,draincoeff,d
     Kmid = (Knodes[i+1] + Knodes[i])/2.0
     
     # Continuity
-#    if psiT <= 0:
     j = np.arange(1,n)
     q[j] = -Kmid*((psi[i+1] - psi[i])/dz + 1.0)
     i = np.arange(0,n)
     dpsidt = (-(q[i+1] - q[i])/dz)/C - w[i]/C
 
-#    savew.append(sum(w))
-    savew.append(w[DrainLoc])#/C[DrainLoc])
-#    savet.append(t)
+    savew.append(w[DrainLoc])
     saveq.append(q)
 
     return dpsidt
@@ -76,9 +73,11 @@ global savew
 global saveq
 
 pset = np.loadtxt('input_param.txt')
+#pset[4] = .48
 ICdepth = pset[-5]
-draincoeff = pset[-4]
+draincoeff = 1.0*1.1*pset[-4]
 drain_exp = pset[-3]
+drain_exp = 1.8
 
 DrainLoc = int(round(ICdepth/.1))
 dz = 0.1
@@ -96,19 +95,13 @@ psiBot = []
 
 p = np.loadtxt('rainfall_mm.txt')
 precip_md = []
-for j in range(0,len(p),1):
+for j in range(0,int(len(p)/1),1):
     for k in range(0,4,1):
         precip_md.append(p[j]*0.024)
-
-
-sd1 = 93600 # s
-sd2 = 518400
-sd3 = 525600
-sd4 = 590400
-sd5 = 608400
-model_run_time = 517500
-#model_run_time = 117500
-ET = 0.00128/4
+        
+model_run_time = 4485600
+ET = 0.0205/4
+ET = (0.0205/4)/1.3
 
 PROF = []
 GWA = []
@@ -124,8 +117,9 @@ for j in range(0,4,1):
     Prof_1 = []
     vels = []
     tc = 0
+#    raise Exception
     while elapsed_time < model_run_time:
-        print(j,elapsed_time)
+        print(j,elapsed_time)    
         save_w = []
         save_q = []
         t = np.linspace(0,(timestep/86400),2) # 10 min time step for one hour
@@ -147,7 +141,7 @@ for j in range(0,4,1):
         precip_d = precip_md[tc]
         tc += 1
         if (P[-1,0] < 0): #unsaturated soil column
-            if (elapsed_time < sd1):
+            if (precip_d > 0):
                 KTop=vg.KFun(np.zeros(1)+P[-1,0],p)[0]
                 h2 = ProfileDepth + (precip_d*(timestep/86400)) 
                 infi = KTop*(h2-(zz[-1]+P[-1,0]))/(dz/2)
@@ -157,67 +151,13 @@ for j in range(0,4,1):
                 else:
                     qTop[0:2] = -precip_d
                     GWA_n = 2
-                qTfun = interp1d(t,qTop)
-            elif ((elapsed_time > sd2) and (elapsed_time < sd3)):
-                KTop=vg.KFun(np.zeros(1)+P[-1,0],p)[0]
-                h2 = ProfileDepth + (precip_d*(timestep/86400)) 
-                infi = KTop*(h2-(zz[-1]+P[-1,0]))/(dz/2)
-    
-                if infi  < precip_d:
-                    qTop[0:2] = -infi
-                    GWA_n = 1
-                else:
-                    qTop[0:2] = -precip_d
-                    GWA_n = 2
-                qTfun = interp1d(t,qTop)
-                
-            elif ((elapsed_time > sd4) and (elapsed_time < sd5)):
-                KTop=vg.KFun(np.zeros(1)+P[-1,0],p)[0]
-                h2 = ProfileDepth + (precip_d*(timestep/86400)) 
-                infi = KTop*(h2-(zz[-1]+P[-1,0]))/(dz/2)
-    
-                if infi  < precip_d:
-                    qTop[0:2] = -infi
-                    GWA_n = 1
-                else:
-                    qTop[0:2] = -precip_d
-                    GWA_n = 2
-                qTfun = interp1d(t,qTop)
-    
+                qTfun = interp1d(t,qTop)    
             else:
                 qTop[0:2]= ET # Evaporation
                 qTfun = interp1d(t,qTop) 
                 GWA_n = 4
         else: # saturated soil column- runoff
-            if (elapsed_time < sd1):
-                psiTop = 0
-                KTop=vg.KFun(np.zeros(1)+P[-1,0],p)[0]
-                PressFlux = KTop*((psiTop - P[-1,0])/dz*2 + 1)
-                if PressFlux > precip_d:
-                    qTop[0:2] = -precip_d
-                    qTfun = interp1d(t,qTop) 
-                    psiTop = []
-                    GWA_n = 5
-                else:
-                    qTop[0:2] = -PressFlux
-                    qTfun = interp1d(t,qTop) 
-                    psiTop = []
-                    GWA_n = 6
-            elif ((elapsed_time > sd2) and (elapsed_time < sd3)):
-                psiTop = 0
-                KTop=vg.KFun(np.zeros(1)+P[-1,0],p)[0]
-                PressFlux = KTop*((psiTop - P[-1,0])/dz*2 + 1)
-                if PressFlux > precip_d:
-                    qTop[0:2] = -precip_d
-                    qTfun = interp1d(t,qTop) 
-                    psiTop = []
-                    GWA_n = 5
-                else:
-                    qTop[0:2] = -PressFlux
-                    qTfun = interp1d(t,qTop) 
-                    psiTop = []
-                    GWA_n = 6
-            elif ((elapsed_time > sd4) and (elapsed_time < sd5)):
+            if (precip_d>0):
                 psiTop = 0
                 KTop=vg.KFun(np.zeros(1)+P[-1,0],p)[0]
                 PressFlux = KTop*((psiTop - P[-1,0])/dz*2 + 1)
@@ -244,32 +184,7 @@ for j in range(0,4,1):
     
         if psi[-1][-1] > (dz/2):
             print('Overshot BC')
-            if (elapsed_time < sd1):
-                psiTop = 0
-                KTop=vg.KFun(np.zeros(1)+P[-1,0],p)[0]
-                PressFlux = KTop*((psiTop - P[-1,0])/dz*2 + 1)
-                if PressFlux > precip_d:
-                    qTop[0:2] = -precip_d
-                    qTfun = interp1d(t,qTop) 
-                    GWA_n = 5
-                else:
-                    qTop[0:2] = -PressFlux
-                    qTfun = interp1d(t,qTop) 
-                    GWA_n = 6
-                   
-            elif ((elapsed_time > sd2) and (elapsed_time < sd3)):
-                psiTop = 0
-                KTop=vg.KFun(np.zeros(1)+P[-1,0],p)[0]
-                PressFlux = KTop*((psiTop - P[-1,0])/dz*2 + 1)
-                if PressFlux > precip_d:
-                    qTop[0:2] = -precip_d
-                    qTfun = interp1d(t,qTop) 
-                    GWA_n = 5
-                else:
-                    qTop[0:2] = -PressFlux
-                    qTfun = interp1d(t,qTop) 
-                    GWA_n = 6
-            elif ((elapsed_time > sd4) and (elapsed_time < sd5)):
+            if (precip_d>0):
                 psiTop = 0
                 KTop=vg.KFun(np.zeros(1)+P[-1,0],p)[0]
                 PressFlux = KTop*((psiTop - P[-1,0])/dz*2 + 1)
@@ -304,11 +219,10 @@ for j in range(0,4,1):
     TILE.append(P1_td)
     VELS.append(vels)
 
-raise Exception
-
-##########################################################################
+###########################################################################
 # Soils
 soils = np.load('SOILArray.npy')
+
 intakes = np.load('intakes2.npy')
 intakes_ = np.load('intakes_nu.npy')
 intakes2 = []
@@ -317,13 +231,12 @@ for j in range(0,len(intakes_),1):
         intakes2.append(intakes_[j])
 
 ocoeff = pset[-2]
-    
 wa = []
 intake_index = []
 
 for i in range(0,len(intakes),2):
     ppp = 0
-    for j in range(np.shape(soils)[0]-1,-1,-1):
+    for j in range(np.shape(soils)[0]-1,-1,-1): 
         for k in range(0,np.shape(soils)[1],1):
             if ((j == (72-intakes[i][0])) and (k == intakes[i][1])):
                 intake_index.append(ppp+62)
@@ -332,12 +245,11 @@ for i in range(0,len(intakes),2):
     
 p = np.loadtxt('rainfall_mm.txt')
 precip_md = []
-for j in range(0,len(p),1):
+for j in range(0,int(len(p)/1),1):
     for k in range(0,4,1):
         precip_md.append(p[j]*0.024)
 
 doi1 = pset[-1]
-doi1 = .07
 
 T_h = []
 cc = 0
@@ -347,14 +259,7 @@ mg.set_watershed_boundary_condition(z, -9999)
 of = OverlandFlow(mg, mannings_n = 0.025, alpha = 0.4, steep_slopes = True,h_init = 1e-7)
 
 elapsed_time = 0.
-ET2 = -0.0006/86400
-
-H = np.zeros((4464,205000)) 
-qq = np.zeros((8794,205000)) 
-hm = 0
-
-H[:,0] = mg.at_node['surface_water__depth']
-qq[:,0] = mg.at_link['surface_water__discharge']
+ET2 = -0.00001/86400
 
 tt = []
 tc = 0
@@ -364,13 +269,7 @@ while elapsed_time < model_run_time:
     precip_d = precip_md[tc]
     tc += 1
     t = np.linspace(0,(timestep/86400),2) # 10 min time step for one hour
-    if (elapsed_time < sd1):
-        gridded_water_array = np.zeros(np.shape(mg.at_node['surface_water__depth']))
-        starting_precip = precip_d/86400
-    elif ((elapsed_time > sd2) and (elapsed_time < sd3)):
-        gridded_water_array = np.zeros(np.shape(mg.at_node['surface_water__depth']))
-        starting_precip = precip_d/86400
-    elif ((elapsed_time > sd4) and (elapsed_time < sd5)):
+    if (precip_d>0):
         gridded_water_array = np.zeros(np.shape(mg.at_node['surface_water__depth']))
         starting_precip = precip_d/86400
     else:
@@ -404,14 +303,11 @@ while elapsed_time < model_run_time:
                 else:
                     GWA_n = GWA[3][int(elapsed_time/timestep)][0]
                     infi = GWA[3][int(elapsed_time/timestep)][1]
-                    
-                print(tt[-1],elapsed_time, ppp,GWA_n)
 
                 if (GWA_n == 1):
                     if elapsed_time > 1800:
                         excess = (precip_d - infi)/(86400)
                         gridded_water_array[ppp] += excess
-                        hm+= excess
                     else:
                         gridded_water_array[ppp] += 0
                 elif (GWA_n == 2): # 
@@ -426,7 +322,6 @@ while elapsed_time < model_run_time:
                     gridded_water_array[ppp] += 0
                 elif (GWA_n == 6):
                     gridded_water_array[ppp] += starting_precip
-                    hm += starting_precip
                 elif (GWA_n == 7):
                     gridded_water_array[ppp] += 0
                 else:
@@ -434,13 +329,14 @@ while elapsed_time < model_run_time:
                 
                 if (ppp in intake_index):
                     if (mg.at_node['surface_water__depth'][ppp] > doi1):
-                        gridded_water_array[ppp] += -((ocoeff*((2*9.81*(mg.at_node['surface_water__depth'][ppp]-doi1))**4.05))/(90*90))
-                        water_intake.append([ppp,mg.at_node['surface_water__depth'][ppp],((ocoeff*((2*9.81*(mg.at_node['surface_water__depth'][ppp]-doi1))**4.05)))])
+                        gridded_water_array[ppp] += -((ocoeff*((2*9.81*(mg.at_node['surface_water__depth'][ppp]-doi1))**4.519))/(90*90))
+                        water_intake.append([ppp,mg.at_node['surface_water__depth'][ppp],((ocoeff*((2*9.81*(mg.at_node['surface_water__depth'][ppp]-doi1))**4.519)))])
                     else:
                         gridded_water_array[ppp] += 0
                         water_intake.append([ppp, mg.at_node['surface_water__depth'][ppp], 0])
             ppp = ppp + 1 
     ov_elap = 0
+    print(elapsed_time)
     while (ov_elap < timestep):        
         cc = cc + 1
         mg.at_node['surface_water__depth'] += gridded_water_array*5 
@@ -451,11 +347,9 @@ while elapsed_time < model_run_time:
                 
         of.run_one_step(dt = 5)
         ov_elap += 5
-        H[:,cc] = mg.at_node['surface_water__depth']
-        qq[:,cc] = mg.at_link['surface_water__discharge'] 
         T_h.append(ov_elap + elapsed_time)
   
-        print(ov_elap)
-
     elapsed_time +=  timestep
     wa.append(water_intake)
+
+
